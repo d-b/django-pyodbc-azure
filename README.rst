@@ -18,7 +18,7 @@ Features
 --------
 
 -  Supports Django 2.0.6
--  Supports Microsoft SQL Server 2008/2008R2, 2012, 2014, 2016, 2017 and
+-  Supports Microsoft SQL Server 2005, 2008/2008R2, 2012, 2014, 2016, 2017 and
    Azure SQL Database
 -  Passes most of the tests of the Django test suite
 -  Compatible with

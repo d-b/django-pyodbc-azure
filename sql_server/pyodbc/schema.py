@@ -673,7 +673,12 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         for particularly tricky backends (defaults are not user-defined, though,
         so this is safe).
         """
-        if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
+        if isinstance(value, datetime.datetime):
+            if self.connection.use_legacy_datetime:
+                return "'%s'" % value.replace(tzinfo=None)
+            else:
+                return "'%s'" % value
+        elif isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
             return "'%s'" % value
         elif isinstance(value, str):
             return "'%s'" % value.replace("'", "''")
