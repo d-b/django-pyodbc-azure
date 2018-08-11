@@ -152,6 +152,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         '08S02',
     )
     _sql_server_versions = {
+        9: 2005,
         10: 2008,
         11: 2012,
         12: 2014,
@@ -191,6 +192,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             self.driver_charset = 'utf-8'
         else:
             self.driver_charset = opts.get('driver_charset', None)
+
+        # data type compatibility to databases created by old django-pyodbc
+        self.use_legacy_datetime = opts.get('use_legacy_datetime', False)
 
         # interval to wait for recovery from network error
         interval = opts.get('connection_recovery_interval_msec', 0.0)
@@ -352,10 +356,17 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         cursor.execute('SET DATEFORMAT ymd; SET DATEFIRST %s' % datefirst)
 
         # http://blogs.msdn.com/b/sqlnativeclient/archive/2008/02/27/microsoft-sql-server-native-client-and-microsoft-sql-server-2008-native-client.aspx
-        val = cursor.execute('SELECT SYSDATETIME()').fetchone()[0]
-        if isinstance(val, str):
-            raise ImproperlyConfigured(
-                "The database driver doesn't support modern datatime types.")
+        try:
+            val = cursor.execute('SELECT SYSDATETIME()').fetchone()[0]
+            if isinstance(val, str):
+                # the driver doesn't support the modern datetime types
+                self.use_legacy_datetime = True
+        except Exception:
+            # the server doesn't support the modern datetime types
+            self.use_legacy_datetime = True
+        if self.use_legacy_datetime:
+            self._use_legacy_datetime()
+            self.features.supports_microsecond_precision = False
 
     def is_usable(self):
         try:
@@ -451,6 +462,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                 allowed = self._get_trancount() > 0
             if allowed:
                 self.connection.autocommit = autocommit
+
+    def _use_legacy_datetime(self):
+        for field in ('DateField', 'DateTimeField', 'TimeField'):
+            self.data_types[field] = 'datetime'
 
     def check_constraints(self, table_names=None):
         self._execute_foreach('ALTER TABLE %s WITH CHECK CHECK CONSTRAINT ALL',
